@@ -29,9 +29,7 @@ pub const PLA = struct {
         return PLA{ .raw_pla = raw_pla };
     }
 
-    pub fn minimize(pla: PLA, gpa: Allocator) !void {
-        _ = gpa;
-
+    pub fn minimize(pla: PLA) !c.cost_t {
         const fold = c.sf_save(pla.raw_pla.*.F);
         errdefer {
             pla.raw_pla.*.F = fold;
@@ -40,20 +38,19 @@ pub const PLA = struct {
 
         pla.raw_pla.*.F = c.espresso(pla.raw_pla.*.F, pla.raw_pla.*.D, pla.raw_pla.*.R);
 
-        var cost: c.cost_t = undefined;
-        try pla.execute(fold, &cost);
+        const ret = try execute(.@"error", c.verify, .{
+            pla.raw_pla.*.F, fold, pla.raw_pla.*.D,
+        }, c.VERIFY_TIME, pla.raw_pla.*.F);
+
         c.free_cover(fold);
+
+        return ret.cost;
     }
 
-    /// EXECUTE(err = verify(PLA->F, fold, PLA->D), VERIFY_TIME, PLA->F, cost);
-    fn execute(pla: PLA, fold: c.pset_family, cost: *c.cost_t) !void {
-        var t = c.ptime();
-        const err = c.verify(pla.raw_pla.*.F, fold, pla.raw_pla.*.D);
-        c.totals(t, c.VERIFY_TIME, pla.raw_pla.*.F, cost);
-        if (err > 0) {
-            std.log.err("execute failed with errno: {d}", .{err});
-            return error.ExecuteFailed;
-        }
+    pub fn logSolution(pla: PLA) !void {
+        _ = try execute(.{ .type = void }, c.fprint_pla, .{
+            c.stderr, pla.raw_pla, c.FD_type,
+        }, c.WRITE_TIME, pla.raw_pla.*.F);
     }
 
     pub fn deinit(pla: PLA) void {
@@ -65,15 +62,53 @@ pub const PLA = struct {
         c.sf_cleanup();
         c.sm_cleanup();
     }
-};
 
-export fn add(a: i32, b: i32) i32 {
-    return a + b;
-}
+    const ExecuteRetType = union(enum) {
+        @"error",
+        type: type,
+    };
+
+    fn ExecuteResult(comptime Ret: type) type {
+        return struct {
+            ret: Ret,
+            cost: c.cost_t,
+        };
+    }
+
+    /// Encapsulation of the EXECUTE macro
+    fn execute(
+        comptime ret_type: ExecuteRetType,
+        func: anytype,
+        args: anytype,
+        record_type: u8,
+        s: anytype,
+    ) !ExecuteResult(switch (ret_type) {
+        .@"error" => void,
+        .type => |t| t,
+    }) {
+        var cost: c.cost_t = undefined;
+        var t = c.ptime();
+        const ret = @call(.auto, func, args);
+        c.totals(t, record_type, s, &cost);
+        if (ret_type == .@"error" and ret > 0) {
+            std.log.err("execute failed with errno: {d}", .{ret});
+            return error.ExecuteFailed;
+        }
+        return ExecuteResult(switch (ret_type) {
+            .@"error" => void,
+            .type => |tt| tt,
+        }){
+            .ret = if (ret_type == .@"error") {} else ret,
+            .cost = cost,
+        };
+    }
+};
 
 test "basic add functionality" {
     const filename = "example.in";
     const pla = try PLA.openPath(filename);
     defer pla.deinit();
-    try pla.minimize(testing.allocator);
+    const cost = try pla.minimize();
+    _ = cost;
+    try pla.logSolution();
 }
