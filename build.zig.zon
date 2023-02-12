@@ -7,5 +7,9 @@
             .url = "https://github.com/kubkon/espresso/archive/44d1b720d12a4991094e3efaba3785b522eb3494.tar.gz",
             .hash = "122061c2d61c3c4013a03c20803118ef938f3a6869b10f65c0b6fcc37e31216fe2d6",
         },
+        .libeqntott = .{
+            .url = "https://github.com/kubkon/eqntott/archive/ff96915d819dd764b5211627a78101f7e92f8eb7.tar.gz",
+            .hash = "1220344a0f63da6c3d81a5ff42e7a16d96829ab4b305d3d0b8ae10a8202c31c41132",
+        },
     },
 }

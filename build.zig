@@ -8,6 +8,10 @@ pub fn build(b: *std.Build.Builder) void {
         .target = target,
         .optimize = mode,
     });
+    const libeqntott = b.dependency("libeqntott", .{
+        .target = target,
+        .optimize = mode,
+    });
 
     const lib = b.addStaticLibrary(.{
         .name = "espresso-zig",
@@ -15,6 +19,7 @@ pub fn build(b: *std.Build.Builder) void {
         .optimize = mode,
     });
     lib.linkLibrary(libespresso.artifact("espresso"));
+    lib.linkLibrary(libeqntott.artifact("eqntott-lib"));
     lib.linkLibC();
     lib.install();
 
@@ -24,6 +29,7 @@ pub fn build(b: *std.Build.Builder) void {
         .optimize = mode,
     });
     main_tests.linkLibrary(libespresso.artifact("espresso"));
+    main_tests.linkLibrary(libeqntott.artifact("eqntott-lib"));
     main_tests.linkLibC();
 
     const test_step = b.step("test", "Run library tests");
