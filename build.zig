@@ -1,22 +1,29 @@
 const std = @import("std");
 
-pub fn build(b: *std.build.Builder) void {
+pub fn build(b: *std.Build.Builder) void {
     const target = b.standardTargetOptions(.{});
-    const mode = b.standardReleaseOptions();
+    const mode = b.standardOptimizeOption(.{});
 
-    const espresso_c_dep = b.dependency("espresso", .{});
+    const libespresso = b.dependency("libespresso", .{
+        .target = target,
+        .optimize = mode,
+    });
 
-    const lib = b.addStaticLibrary("espresso-zig", "src/main.zig");
-    lib.setTarget(target);
-    lib.setBuildMode(mode);
-    lib.linkLibrary(espresso_c_dep.artifact("espresso"));
+    const lib = b.addStaticLibrary(.{
+        .name = "espresso-zig",
+        .target = target,
+        .optimize = mode,
+    });
+    lib.linkLibrary(libespresso.artifact("espresso"));
     lib.linkLibC();
     lib.install();
 
-    const main_tests = b.addTest("src/main.zig");
-    main_tests.setTarget(target);
-    main_tests.setBuildMode(mode);
-    main_tests.linkLibrary(espresso_c_dep.artifact("espresso"));
+    const main_tests = b.addTest(.{
+        .root_source_file = .{ .path = "src/main.zig" },
+        .target = target,
+        .optimize = mode,
+    });
+    main_tests.linkLibrary(libespresso.artifact("espresso"));
     main_tests.linkLibC();
 
     const test_step = b.step("test", "Run library tests");

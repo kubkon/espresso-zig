@@ -1,0 +1,11 @@
+.{
+    .name = "libespresso-zig",
+    .version = "0.0.1",
+
+    .dependencies = .{
+        .libespresso = .{
+            .url = "https://github.com/kubkon/espresso/archive/44d1b720d12a4991094e3efaba3785b522eb3494.tar.gz",
+            .hash = "122061c2d61c3c4013a03c20803118ef938f3a6869b10f65c0b6fcc37e31216fe2d6",
+        },
+    },
+}

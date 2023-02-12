@@ -105,7 +105,7 @@ pub const PLA = struct {
 };
 
 test "basic add functionality" {
-    const filename = "example.in";
+    const filename = "test.pla";
     const pla = try PLA.openPath(filename);
     defer pla.deinit();
     const cost = try pla.minimize();
