@@ -1,4 +1,5 @@
 const std = @import("std");
+const assert = std.debug.assert;
 const testing = std.testing;
 
 const Allocator = std.mem.Allocator;
@@ -22,6 +23,8 @@ extern "c" fn yyparse() void;
 extern "c" fn canon(*c.BNODE) *c.BNODE;
 extern "c" fn read_ones(*c.BNODE, i32) *c.PTERM;
 extern "c" fn cmppt(?*const anyopaque, ?*const anyopaque) i32;
+
+extern var cube: c.cube_struct;
 
 pub fn eqnToTruthTable(s: [:0]const u8, writer: anytype) !void {
     const ptr = @ptrCast(?*anyopaque, @qualCast([*:0]u8, s.ptr));
@@ -140,6 +143,84 @@ pub const PLA = struct {
         return ret.cost;
     }
 
+    /// Based on `fprint_pla` routine with eqntott output mode.
+    /// See `eqn_output` routine.
+    pub fn writeSolution(pla: PLA, var_labels: []const []const u8, out_label: []const u8, writer: anytype) !void {
+        assert(cube.output != -1);
+
+        var first_or: bool = false;
+        var first_and: bool = false;
+        var i: i32 = 0;
+        while (i < cube.part_size[@intCast(usize, cube.output)]) : (i += 1) {
+            try writer.print("{s} = ", .{out_label});
+            first_or = true;
+
+            // foreach_set(PLA->F, last, p)
+            var set_i: i32 = 0;
+            const F = pla.raw_pla.*.F.*;
+            const set_count = F.count * F.wsize;
+            var p = F.data;
+
+            while (set_i < set_count) : (set_i += 1) {
+                if (isInSet(p, i + cube.first_part[@intCast(usize, cube.output)])) {
+                    if (first_or) {
+                        try writer.writeByte('(');
+                    } else {
+                        try writer.writeAll(" | (");
+                    }
+                    first_or = false;
+                    first_and = true;
+
+                    var var_i: i32 = 0;
+                    while (var_i < cube.num_binary_vars) : (var_i += 1) {
+                        const x = getInput(p, var_i);
+                        if (x == c.DASH) continue;
+
+                        const label = var_labels[@intCast(usize, var_i)];
+                        if (!first_and) {
+                            try writer.writeAll(" & ");
+                        }
+                        first_and = false;
+
+                        if (x == c.ZERO) {
+                            try writer.writeByte('!');
+                        }
+                        try writer.print("{s}", .{label});
+                    }
+
+                    try writer.writeByte(')');
+                }
+
+                p += @intCast(usize, F.wsize);
+            }
+
+            try writer.writeAll(";\n");
+        }
+    }
+
+    /// #define WHICH_WORD(e)  (((e) >> LOGBPI) + 1)
+    fn whichWord(e: i32) i32 {
+        return (e >> c.LOGBPI) + 1;
+    }
+
+    /// #define WHICH_BIT(e)  ((e) & (BPI - 1))
+    fn whichBit(e: i32) u5 {
+        return @intCast(u5, e & (c.BPI - 1));
+    }
+
+    /// #define is_in_set(set, e)  (set[WHICH_WORD(e)] & (1 << WHICH_BIT(e)))
+    fn isInSet(p: c.pset, e: i32) bool {
+        const index = whichWord(e);
+        const tst = p[@intCast(usize, index)] & (@as(u32, 1) << whichBit(e));
+        return tst != 0;
+    }
+
+    /// #define GETINPUT(c, pos)
+    fn getInput(p: c.pset, pos: i32) u32 {
+        const index = whichWord(2 * pos);
+        return (p[@intCast(usize, index)] >> whichBit(2 * pos)) & 3;
+    }
+
     pub fn logSolution(pla: PLA) !void {
         _ = try execute(.{ .type = void }, c.fprint_pla, .{
             c.stderr, pla.raw_pla, c.FD_type,
@@ -196,84 +277,6 @@ pub const PLA = struct {
         };
     }
 };
-
-test "from memory" {
-    const s: [:0]const u8 =
-        \\.i 11
-        \\.o 1
-        \\.p 64
-        \\1-000000001  1   
-        \\1-000000011  1   
-        \\1-000000101  1   
-        \\1-000000111  1   
-        \\1-000001001  1   
-        \\1-000001011  1   
-        \\1-000001101  1   
-        \\1-000001111  1   
-        \\1-001000001  1   
-        \\1-001000011  1   
-        \\1-001000101  1   
-        \\1-001000111  1   
-        \\1-001001001  1   
-        \\1-001001011  1   
-        \\1-001001101  1   
-        \\1-001001111  1   
-        \\1-010000001  1   
-        \\1-010000011  1   
-        \\1-010000101  1   
-        \\1-010000111  1   
-        \\1-010001001  1   
-        \\1-010001011  1   
-        \\1-010001101  1   
-        \\1-010001111  1   
-        \\1-011000001  1   
-        \\1-011000011  1   
-        \\1-011000101  1   
-        \\1-011000111  1   
-        \\1-011001001  1   
-        \\1-011001011  1   
-        \\1-011001101  1   
-        \\1-011001111  1   
-        \\1100000000-  1   
-        \\1100000001-  1   
-        \\1100000010-  1   
-        \\1100000011-  1   
-        \\1100000100-  1   
-        \\1100000101-  1   
-        \\1100000110-  1   
-        \\1100000111-  1   
-        \\1100100000-  1   
-        \\1100100001-  1   
-        \\1100100010-  1   
-        \\1100100011-  1   
-        \\1100100100-  1   
-        \\1100100101-  1   
-        \\1100100110-  1   
-        \\1100100111-  1   
-        \\1101000000-  1   
-        \\1101000001-  1   
-        \\1101000010-  1   
-        \\1101000011-  1   
-        \\1101000100-  1   
-        \\1101000101-  1   
-        \\1101000110-  1   
-        \\1101000111-  1   
-        \\1101100000-  1   
-        \\1101100001-  1   
-        \\1101100010-  1   
-        \\1101100011-  1   
-        \\1101100100-  1   
-        \\1101100101-  1   
-        \\1101100110-  1   
-        \\1101100111-  1   
-        \\.e
-    ;
-    const pla = try PLA.openMem(s);
-    defer pla.deinit();
-    const cost = try pla.minimize();
-    _ = cost;
-    try pla.logSolution();
-}
 
 test " full pipeline" {
     const gpa = testing.allocator;
@@ -357,5 +360,15 @@ test " full pipeline" {
     defer pla.deinit();
     const cost = try pla.minimize();
     _ = cost;
-    try pla.logSolution();
+
+    var out = std.ArrayList(u8).init(gpa);
+    defer out.deinit();
+
+    const var_labels: []const []const u8 = &.{
+        "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k",
+    };
+
+    try pla.writeSolution(var_labels, "z", out.writer());
+
+    try testing.expectEqualStrings("z = (a & b & !c & !f & !g) | (a & !c & !f & !g & k);\n", out.items);
 }
