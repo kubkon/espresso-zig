@@ -14,7 +14,19 @@ pub const PLA = struct {
     pub fn openPath(path: [:0]const u8) !PLA {
         const file = c.fopen(path, "r") orelse return error.NotFound;
         defer _ = c.fclose(file);
+        return openStream(file);
+    }
 
+    /// TODO a hack so that I can postpone reimplementing internal espresso
+    /// routines to work with memory or file descriptors rather than C streams.
+    pub fn openMem(s: [:0]const u8) !PLA {
+        const ptr = @ptrCast(?*anyopaque, @qualCast([*:0]u8, s.ptr));
+        const memf = c.fmemopen(ptr, s.len, "r");
+        defer _ = c.fclose(memf);
+        return openStream(memf);
+    }
+
+    fn openStream(file: *c.FILE) !PLA {
         var raw_pla: c.pPLA = undefined;
         switch (c.read_pla(file, c.TRUE, c.TRUE, c.FD_type, &raw_pla)) {
             1 => {}, // success
@@ -107,6 +119,42 @@ pub const PLA = struct {
 test "basic add functionality" {
     const filename = "test.pla";
     const pla = try PLA.openPath(filename);
+    defer pla.deinit();
+    const cost = try pla.minimize();
+    _ = cost;
+    try pla.logSolution();
+}
+
+test "from memory" {
+    const s: [:0]const u8 =
+        \\# there are 4 input variables
+        \\.i 4
+        \\
+        \\# there is only 1 output result
+        \\.o 1
+        \\
+        \\# the following is the truth table
+        \\0000 0
+        \\0001 1
+        \\0010 0
+        \\0011 1
+        \\0100 0
+        \\0101 1
+        \\0110 0
+        \\0111 1
+        \\1000 0
+        \\1001 1
+        \\1010 0
+        \\1011 1
+        \\1100 0
+        \\1101 0
+        \\1110 0
+        \\1111 1
+        \\
+        \\# end of the PLA data
+        \\.e
+    ;
+    const pla = try PLA.openMem(s);
     defer pla.deinit();
     const cost = try pla.minimize();
     _ = cost;
