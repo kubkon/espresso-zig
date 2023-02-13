@@ -4,6 +4,11 @@ pub fn build(b: *std.Build.Builder) void {
     const target = b.standardTargetOptions(.{});
     const mode = b.standardOptimizeOption(.{});
 
+    b.addModule(.{
+        .name = "espresso",
+        .source_file = .{ .path = "src/main.zig" },
+    });
+
     const libespresso = b.dependency("libespresso", .{
         .target = target,
         .optimize = mode,
